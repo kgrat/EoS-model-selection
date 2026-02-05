@@ -113,7 +113,7 @@ Tools:
 
 * Direct Inference from Raw Data: Move beyond summarized posteriors (KDEs) to infer the EoS directly from raw LIGO strain data (using Bilby) and NICER pulse profiles, utilizing the full unmarginalized prior volume for higher precision.
 
-* Next-Gen Detectors: Scale the pipeline to handle thousands of events expected from LIGO A+ and Cosmic Explorer using Simulation-Based Inference (SBI).
+* Next-Gen Detectors: Scale the pipeline to handle thousands of events expected from LIGO using Simulation-Based Inference (SBI).
 
 ---
 *Author: Kushagra Trivedi, BS-MS 2029, IISER Bhopal*
