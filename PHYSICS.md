@@ -44,12 +44,11 @@ This model tests for a **First-Order Phase Transition** (e.g., Hadron $\to$ Quar
 
 * **Transition:** At $P_{trans}$, density jumps from $\epsilon_h \to \epsilon_q$ (Latent Heat $\Delta \epsilon$).
 
-* **Quark Phase:** The speed of sound $c_{QM}^2$ is constant.
+* **Quark Phase:** The speed of sound in the quark matter phase $c_{QM}^2$ is constant.
   
 
-  $$
-  P(\epsilon) = P_{trans} + c_{QM}^2 (\epsilon - \epsilon_{q})
-  $$
+  P(ε) = P_trans + c_QM² (ε − ε_q)
+  
 
 * **Parameters:** $\{\log P_1, \Gamma, P_{trans}, \Delta \epsilon, c_{QM}^2\}$ (5 parameters).
 
@@ -66,7 +65,7 @@ $$
 
 * **Parameters:** $\{\gamma_0, \gamma_1, \gamma_2, \gamma_3\}$ (4 parameters).
 
-* **Result:** **Disfavored.** The requirement for smoothness causes the model to oscillate unphysically when trying to fit the sharp constraints, failing to support high-mass stars while maintaining a small radius.
+* **Result:** **Disfavored.** Because the adiabatic index Γ is expanded freely, certain parameter choices can lead to equations of state that violate physical constraints (e.g., causality). These are filtered out during the sampling process.
 
 ## 3. Observational Constraints (Likelihoods)
 
