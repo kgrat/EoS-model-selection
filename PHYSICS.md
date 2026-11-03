@@ -1,143 +1,172 @@
-# ⚛️ Physics & Models Documentation
+# Physics and Models
 
-This document details the theoretical frameworks and equations implemented in the JAX solver.
+This document lists the equations and parameter choices implemented in the JAX solvers. All code works in SI units: pressure $P$ in Pa, rest-mass density $\rho$ in kg/m$^3$, energy density $\epsilon$ in J/m$^3$.
 
-## 1. The Tolman-Oppenheimer-Volkoff (TOV) Equations
+## 1. The Tolman-Oppenheimer-Volkoff (TOV) equations
 
-The structure of a static, spherically symmetric relativistic star is governed by the TOV equations. We solve these for pressure $P(r)$ and mass $m(r)$:
-
-$$
-\frac{dP}{dr} = -\frac{G(\epsilon + P/c^2)(m + 4\pi r^3 P/c^2)}{r(r - 2Gm/c^2)}
-$$
+A static, spherically symmetric star in general relativity satisfies
 
 $$
-\frac{dm}{dr} = 4\pi r^2 \rho
+\frac{dm}{dr} = 4\pi r^2 \frac{\epsilon}{c^2}
 $$
 
-Where $\epsilon$ is the energy density ($\epsilon \approx \rho c^2$). The solver integrates from the center ($P_c$) to the surface ($P=0$).
-
-## 2. The Equation of State (EoS) Models
-
-We test three distinct parameterizations connecting Pressure ($P$) and Density ($\rho$).
-
-### A. Piecewise Polytrope (The "Standard" Model)
-
-*Based on Read et al. (2009).*
-This model assumes the EoS is composed of discrete power-law segments stitched together at fixed densities ($\rho_1, \rho_2, \rho_3$).
-
 $$
-P(\rho) = K_i \rho^{\Gamma_i}
+\frac{dP}{dr} = -\frac{G\left(\epsilon/c^2 + P/c^2\right)\left(m + 4\pi r^3 P/c^2\right)}{r^2\left(1 - 2Gm/(rc^2)\right)}
 $$
 
-* **Parameters:** $\{\log P_1, \Gamma_1, \Gamma_2\}$ (3 parameters).
+Here $\epsilon$ is the **total energy density** (rest mass plus internal energy), not the rest-mass density $\rho$. Gravity couples to all of the energy, so $\epsilon$ appears in both equations. Using $\rho$ instead under-counts the mass-energy at high density and overestimates the maximum mass (see the Changelog in the README).
 
-* **Behavior:** Allows for sharp changes in stiffness ("soft" to "stiff") at specific densities.
+Integration starts at $r_0 = 10$ m with $m(r_0) = \tfrac{4}{3}\pi r_0^3\,\epsilon_c/c^2$ and $P(r_0) = P_c$, and uses fixed-step RK4 with $dr = 10$ m out to 30 km. The radius $R$ is where $P$ first reaches zero and the mass is $M = m(R)$. All the solver needs from the EoS is $\epsilon(P)$; each model below provides it.
 
-* **Result:** Fits the data best because it captures the specific "Soft-then-Stiff" requirement of LIGO/NICER.
+## 2. Energy density of a polytrope
 
-### B. Constant Speed of Sound (CSS) / Hybrid Model
+For a cold, barotropic EoS the first law of thermodynamics is
 
-*Based on Alford, Han, & Prakash (2013).*
-This model tests for a **First-Order Phase Transition** (e.g., Hadron $\to$ Quark). It introduces a discontinuity in the energy density.
+$$
+d\!\left(\frac{\epsilon}{\rho}\right) = -P\, d\!\left(\frac{1}{\rho}\right).
+$$
 
-* **Hadronic Phase:** Standard Polytrope.
+For a polytropic piece $P = K_i \rho^{\Gamma_i}$ on $\rho_{i-1} \le \rho < \rho_i$ this integrates to (Read et al. 2009, Eqs. 6-7)
 
-* **Transition:** At $P_{trans}$, density jumps from $\epsilon_h \to \epsilon_q$ (Latent Heat $\Delta \epsilon$).
+$$
+\epsilon(\rho) = (1 + a_i)\,\rho c^2 + \frac{K_i}{\Gamma_i - 1}\,\rho^{\Gamma_i},
+$$
 
-* **Quark Phase:** The speed of sound $c_{QM}^2$ is constant.
-  
+$$
+a_i = \frac{\epsilon(\rho_{i-1})}{\rho_{i-1} c^2} - 1 - \frac{K_i}{(\Gamma_i - 1)\,c^2}\,\rho_{i-1}^{\Gamma_i - 1}.
+$$
+
+The constant $a_i$ makes $\epsilon$ continuous at each dividing density. For the crust, $a_0 = 0$, so $\epsilon \to \rho c^2$ as $\rho \to 0$. Since $K_i\rho^{\Gamma_i} = P$, the second term is $P/(\Gamma_i - 1)$, the internal energy. Inside the ODE, $\epsilon(P)$ is computed as $P \to \rho$ (inverse EoS) $\to \epsilon(\rho)$, using `jnp` gathers over the segment tables so it stays JIT- and `vmap`-compatible.
+
+The sound speed follows from $c_s^2 = dP/d\epsilon = \Gamma P/(\epsilon + P)$ (in units of $c^2$).
+
+## 3. The EoS models
+
+### A. Piecewise polytrope
+
+*Read et al. (2009), with a different crust and knot choice.*
+
+* **Crust:** $P = K_c \rho^{\Gamma_c}$ with $K_c = 1.0557\times10^5$ (SI) and $\Gamma_c = 1.58425$ for $\rho < 0.5\,\rho_{nuc}$, where $\rho_{nuc} = 2.7\times10^{17}$ kg/m$^3$.
+* **Core:** three knots at $\rho_1 = 1.85\,\rho_{nuc}$, $\rho_2 = 3.7\,\rho_{nuc}$ and $\rho_3 = 7.4\,\rho_{nuc}$, with free pressures $P_1, P_2, P_3$. The segment $[0.5\,\rho_{nuc}, \rho_1)$ joins the crust to $(\rho_1, P_1)$. Above $\rho_2$ the segment through $(\rho_2, P_2)$ and $(\rho_3, P_3)$ is continued to all higher densities.
+* **Parameters:** $\{\log_{10}P_1, \log_{10}P_2, \log_{10}P_3\}$ ($P$ in Pa).
+* **Energy density:** Section 2, with four segments.
+
+The single-segment crust differs from the four-piece SLy crust in Read et al.; at the stitch it gives about 2.7 times the SLy pressure. Running SLy's core through this crust gives $R_{1.4}$ about 0.45 km larger than with the SLy crust (see `validation_output.txt`).
+
+### B. Constant speed of sound (CSS) hybrid model
+
+*Alford, Han & Prakash (2013).* Tests for a first-order hadron-quark transition.
+
+* **Crust:** as above, for $P < P_{stitch} = K_c (0.5\rho_{nuc})^{\Gamma_c}$.
+* **Hadronic phase** ($P_{stitch} \le P < P_{trans}$): $P = K_h \rho^{\Gamma_h}$ with $K_h = P_1/(1.85\rho_{nuc})^{\Gamma_h}$, and
+  $\epsilon_h = (1 + a_h)\rho c^2 + P/(\Gamma_h - 1)$. $a_h$ makes $\epsilon$ continuous at $P_{stitch}$.
+* **Transition** at $P_{trans}$: the energy density jumps from $\epsilon_h(P_{trans})$ to
+  $\epsilon_q = \epsilon_h(P_{trans}) + \Delta\epsilon$, with pressure held constant (latent heat).
+* **Quark phase** ($P \ge P_{trans}$):
 
   $$
-  P(\epsilon) = P_{trans} + c_{QM}^2 (\epsilon - \epsilon_{q})
+  P(\epsilon) = P_{trans} + c_s^2\,(\epsilon - \epsilon_q).
   $$
 
-* **Parameters:** $\{\log P_1, \Gamma, P_{trans}, \Delta \epsilon, c_{QM}^2\}$ (5 parameters).
+* **Parameters:** $\{\log_{10}P_1, \Gamma_h, \log_{10}P_{trans}, \Delta\epsilon/(\rho_{nuc}c^2), c_s^2/c^2\}$.
 
-* **Result:** Fits well, but the extra complexity is penalized by the Bayesian Evidence.
+Stars are labelled by their central energy density $\epsilon_c$; $P_c$ is found by bisection on $\epsilon(P)$. The rest-mass density in the quark phase (used only for plots) follows from $d\rho/\rho = d\epsilon/(\epsilon + P)$. The jump in $\rho$ at the transition comes from continuity of the baryon chemical potential $(\epsilon + P)/n$.
 
-### C. Spectral Parameterization
+The crust hands over to the hadronic polytrope at fixed pressure $P_{stitch}$. In general the hadronic $\rho$ at that pressure differs from $0.5\rho_{nuc}$, so $\rho$, but not $P$ or $\epsilon$, is discontinuous there. This has no effect on the TOV solution, which only uses $\epsilon(P)$.
 
-*Based on Lindblom (2010).*
-This model enforces smoothness by expanding the adiabatic index $\Gamma$ as a polynomial in log-pressure space.
+### C. Spectral parameterization
 
-$$
-\Gamma(x) = \exp\left( \sum_{k=0}^3 \gamma_k x^k \right)
-$$
-
-* **Parameters:** $\{\gamma_0, \gamma_1, \gamma_2, \gamma_3\}$ (4 parameters).
-
-* **Result:** **Disfavored.** The requirement for smoothness causes the model to oscillate unphysically when trying to fit the sharp constraints, failing to support high-mass stars while maintaining a small radius.
-
-## 3. Observational Constraints (Likelihoods)
-
-The models are vetted against three key datasets using Kernel Density Estimation (KDE):
-
-1. **LIGO GW170817:** Constrains the **Tidal Deformability (**$\Lambda$**)**.
-
-   * *Physics:* A "soft" EoS (small radius) produces less tidal distortion.
-
-   * *Constraint:* Favors $R_{1.4} < 13.5$ km.
-
-2. **NICER PSR J0030+0451:** A standard mass pulsar (\~1.4 $M_{\odot}$).
-
-   * *Constraint:* Provides a broad radius measurement.
-
-3. **NICER PSR J0740+6620:** The most massive known neutron star (\~2.08 $M_{\odot}$).
-
-   * *Physics:* Requires a very "stiff" EoS core to prevent collapse into a black hole.
-
-   * *Constraint:* Sets a hard lower limit on stiffness at high densities.
-
-## 4. Bayesian Statistical Framework
-We employ **Bayesian Model Selection** to compare the EoS parameterizations. The probability of a model $M$ given data $D$ is proportional to the **Bayesian Evidence** ($\mathcal{Z}$):
+*Lindblom (2010).* The adiabatic index is expanded in $x = \ln(P/P_0)$, with $P_0 = P_{stitch}$:
 
 $$
-P(M|D) \propto P(D|M) P(M) = \mathcal{Z} \cdot P(M)
+\Gamma(x) = \exp\left(\sum_{k=0}^3 \gamma_k x^k\right).
 $$
 
-Where the Evidence $\mathcal{Z}$ is the integral of the likelihood $\mathcal{L}$ over the entire prior volume $\pi(\theta)$:
+The energy density follows from Lindblom's integrals (his Eqs. 8-9):
 
 $$
-\mathcal{Z} = \int \mathcal{L}(D|\theta, M) \pi(\theta|M) d\theta
+\mu(x) = \exp\left(-\int_0^x \frac{dx'}{\Gamma(x')}\right), \qquad
+\epsilon(x) = \frac{\epsilon_0}{\mu(x)} + \frac{1}{\mu(x)}\int_0^x \frac{\mu(x')\,P_0 e^{x'}}{\Gamma(x')}\,dx', \qquad
+\rho(x) = \frac{\rho_0}{\mu(x)}.
 $$
 
-To compare two models (e.g., Hybrid vs. Standard), we calculate the **Bayes Factor** ($\mathcal{B}_{AB}$):
+$\epsilon_0 = \rho_0 c^2 + P_0/(\Gamma_c - 1)$ is the crust energy density at the stitch. The integrals are tabulated once per parameter vector, with a cumulative trapezoid on 4000 points up to $P = 10^{37}$ Pa, and $\epsilon(P)$ is interpolated in log space. For constant $\Gamma$ the table agrees with the analytic polytrope to $3\times10^{-7}$.
+
+* **Parameters:** $\{\gamma_0, \gamma_1, \gamma_2, \gamma_3\}$.
+
+With $x$ reaching about 10 at the highest central pressures, the cubic term can dominate. Over much of the prior, $\Gamma$ either becomes very large (acausal) or very small ($\epsilon$ and $\rho$ overflow) at high pressure. Stars that reach the overflow region are dropped.
+
+## 4. Observational likelihood
+
+The likelihood is an approximation built from one-dimensional kernel density estimates (KDEs) of **radius at a fixed mass**. It is not a tidal-deformability likelihood.
 
 $$
-\mathcal{B}_{AB} = \frac{\mathcal{Z}_A}{\mathcal{Z}_B} = \exp(\ln \mathcal{Z}_A - \ln \mathcal{Z}_B)
+\ln\mathcal{L}(\theta) = \ln \hat p_{GW}(R_{1.4}) + \ln \hat p_{J0030}(R_{1.4}) + \ln \hat p_{J0740}(R_{2.08})
 $$
 
-**Interpretation (Jeffreys Scale):**
-* $\ln \mathcal{B} > 1.0$: Substantial Evidence
-* $\ln \mathcal{B} > 2.5$: Strong Evidence
-* $\ln \mathcal{B} > 5.0$: Decisive Evidence
+* $\hat p_{GW}$: KDE of the GW170817 radius samples from the EoS-insensitive analysis (Abbott et al. 2018), using the samples with $1.35 < m_1 < 1.45\,M_\odot$. These radii were derived from the measured tidal deformabilities with EoS-insensitive (quasi-universal) relations, so $\Lambda$ enters only through that external step.
+* $\hat p_{J0030}$: KDE of NICER PSR J0030+0451 radius samples with $1.35 < M < 1.45\,M_\odot$.
+* $\hat p_{J0740}$: KDE of NICER PSR J0740+6620 radius samples with $2.0 < M < 2.15\,M_\odot$. Only applied if $M_{max} > 2.08\,M_\odot$.
 
-## 5. Prior Distributions
+$R_{1.4}$ and $R_{2.08}$ are interpolated on each model's M-R curve. EoSs with $M_{max} < 2.01\,M_\odot$ get $\ln\mathcal{L} \approx -10^{10}$.
 
-We utilize **Uniform Priors** for all parameters to remain agnostic within physically motivated bounds.
+Limitations:
 
-| Model | Parameter | Range | Description |
-| :--- | :--- | :--- | :--- |
-| **Standard** | $\log P_1$ | $[33.0, 35.0]$ | Pressure at $1.85\rho_{nuc}$ |
-| | $\Gamma_1$ | $[2.0, 4.5]$ | Stiffness index 1 |
-| | $\Gamma_2$ | $[1.1, 4.5]$ | Stiffness index 2 |
-| **Hybrid (CSS)** | $\log P_{trans}$ | $[33.5, 35.5]$ | Transition Pressure (Pa) |
-| | $\Delta \epsilon / \rho_{nuc}$ | $[0.0, 2.0]$ | Energy Density Jump |
-| | $c_{QM}^2$ | $[0.33, 1.0]$ | Quark Speed of Sound ($c=1$) |
-| **Spectral** | $\gamma_0$ | $[0.2, 1.5]$ | Intercept ($\approx$ Avg Gamma) |
-| | $\gamma_{1,2,3}$ | $[-0.5, 0.5]$ | Shape coefficients |
+1. Mass-radius posteriors are reduced to a radius distribution in a mass window, so the mass-radius correlation within each measurement is discarded.
+2. The GW170817 and J0030 terms both constrain $R_{1.4}$ and are multiplied as if independent.
+3. EoSs with $2.01 < M_{max} < 2.08\,M_\odot$ skip the J0740 term entirely instead of being scored on it.
+4. No causality cut is applied ($c_s > c$ is allowed).
+5. The M-R curve includes points past the maximum mass (unstable branch) when interpolating.
 
-## 6. Likelihood Function ($\ln \mathcal{L}$)
+## 5. Bayesian model selection
 
-Unlike standard analyses that assume Gaussian errors for Mass/Radius, we account for the non-Gaussian correlations in the observational data using **Kernel Density Estimation (KDE)**.
-
-The total log-likelihood is the sum of the log-probabilities from the independent datasets:
+The evidence is
 
 $$
-\ln \mathcal{L}(\theta) = \ln P_{LIGO}(R_{1.4}(\theta)) + \ln P_{J0030}(R_{1.4}(\theta)) + \ln P_{J0740}(R_{2.08}(\theta))
+\mathcal{Z} = \int \mathcal{L}(D|\theta, M)\,\pi(\theta|M)\,d\theta,
 $$
 
-* **Physics Cuts:** The likelihood is set to $-\infty$ (0 probability) if:
-  1. The Maximum Mass $M_{max} < 2.01 M_{\odot}$ (Violates J0740 existence).
-  2. The EoS becomes acausal ($c_s > c$).
-  3. The star collapses before reaching the observed pulsar masses.
+estimated with `dynesty` static nested sampling (`bound='multi'`). The Bayes factor between models A and B is $\mathcal{B}_{AB} = \exp(\ln\mathcal{Z}_A - \ln\mathcal{Z}_B)$.
+
+On the Jeffreys scale, $|\ln\mathcal{B}| \approx 1$-$2.5$ is "substantial" and $2.5$-$5$ "strong". Two caveats apply to this project:
+
+* $\mathcal{Z}$ depends directly on the prior volume. Widening a uniform prior range in a direction the data do not constrain lowers $\ln\mathcal{Z}$ by the log of the widening factor without any change in fit quality. The three models have unrelated parameterizations and prior ranges, so a $\ln\mathcal{Z}$ difference of about 2 is modest and should not be read as a statement about the physics alone.
+* The likelihood is the KDE approximation above, so all the evidences inherit its limitations.
+
+## 6. Priors
+
+All priors are uniform over the ranges below (from the `prior_transform` functions in the runners).
+
+| Model | Parameter | Range |
+| :--- | :--- | :--- |
+| Polytrope | $\log_{10}P_1$ [Pa] | $[33.0, 34.5]$ |
+| | $\log_{10}P_2$ [Pa] | $[34.0, 35.5]$ |
+| | $\log_{10}P_3$ [Pa] | $[35.0, 36.5]$ |
+| CSS | $\log_{10}P_1$ [Pa] | $[33.5, 35.0]$ |
+| | $\Gamma_h$ | $[2.0, 4.5]$ |
+| | $\log_{10}P_{trans}$ [Pa] | $[33.5, 35.5]$ |
+| | $\Delta\epsilon/(\rho_{nuc}c^2)$ | $[0, 2]$ |
+| | $c_s^2/c^2$ | $[0.33, 1.0]$ |
+| Spectral | $\gamma_0$ | $[0.2, 1.5]$ |
+| | $\gamma_1$ | $[-0.5, 0.5]$ |
+| | $\gamma_2$ | $[-0.2, 0.2]$ |
+| | $\gamma_3$ | $[-0.1, 0.1]$ |
+
+The polytrope prior allows $P_2 < P_1$ or $P_3 < P_2$ (a segment with $\Gamma < 0$, where pressure falls as density rises). The JAX code does not reject these, and for them the inverse map $P \to \rho$ is not well defined. The emcee version in `bayesian-inference-eos` rejects them.
+
+## 7. Validation
+
+`validate_energy_density.py` checks the corrected solver (output in `validation_output.txt`):
+
+* SLy (Read et al. 2009, Tables II-III, 4-piece crust plus 3-piece core): $M_{max} = 2.048\,M_\odot$ and $R_{1.4} = 11.70$ km, against the published 2.049 and 11.736 km. The old $\rho$-based TOV gives 2.456 and 12.20 km for the same EoS. An independent `scipy` DOP853 solver agrees with the JAX RK4 solver to 0.001% in $M_{max}$ and 13 m in $R_{1.4}$.
+* $\epsilon$ is continuous at every segment boundary to $10^{-12}$ or better, and the CSS jump equals $\Delta\epsilon$.
+* $\epsilon \ge \rho c^2$ everywhere; any causality violations are listed.
+
+## References
+
+* Read, Lackey, Owen & Friedman, Phys. Rev. D 79, 124032 (2009).
+* Lindblom, Phys. Rev. D 82, 103011 (2010).
+* Alford, Han & Prakash, Phys. Rev. D 88, 083013 (2013).
+* Abbott et al. (LIGO/Virgo), Phys. Rev. Lett. 121, 161101 (2018).
+* Miller et al., ApJL 887, L24 (2019); Riley et al., ApJL 887, L21 (2019).
+* Miller et al., ApJL 918, L28 (2021); Riley et al., ApJL 918, L27 (2021).

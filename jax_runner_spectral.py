@@ -4,6 +4,7 @@ from scipy.stats import gaussian_kde
 import multiprocessing as mp
 import os
 import pickle
+import argparse
 import jax_physics_spectral as physics 
 
 # Loading data
@@ -56,12 +57,17 @@ def log_likelihood(params):
     
     masses = np.array(masses)
     radii = np.array(radii)
+    # Drop stars where the EoS overflowed (e.g. spectral Gamma -> 0); NaN would slip past the M_max cut
+    ok = np.isfinite(masses) & np.isfinite(radii)
+    masses, radii = masses[ok], radii[ok]
     
     # 2. Extract Observables
     if len(masses) == 0: return -1e10
     
     M_max = np.max(masses)
-    if M_max < 2.01: return -1e10
+    if M_max < 2.01:
+        # Soft penalty instead of hard wall
+        return -1e10 - 1e4 * (2.01 - M_max)**2
     
     # Sort & Interpolate
     idxs = np.argsort(masses)
@@ -90,6 +96,11 @@ def log_likelihood(params):
 
 # --- 3. RUNNER ---
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--nlive', type=int, default=1500)
+    ap.add_argument('--dlogz', type=float, default=0.1)
+    ap.add_argument('--out', default='jax_spectral_results.pkl')
+    args = ap.parse_args()
     print("\nStarting JAX Analysis (Spectral Model)")
     
     n_cpu = max(1, mp.cpu_count() - 1)
@@ -100,12 +111,12 @@ if __name__ == "__main__":
         # Spectral has 4 Parameters
         sampler = dynesty.NestedSampler(log_likelihood, prior_transform, ndim=4, 
                                         pool=pool, queue_size=n_cpu, 
-                                        nlive=300, bound='multi')
+                                        nlive=args.nlive, bound='multi')
         
-        sampler.run_nested(dlogz=0.5, print_progress=True)
+        sampler.run_nested(dlogz=args.dlogz, print_progress=True)
         
     results = sampler.results
     print(f"\nSpectral Model Log Evidence (lnZ): {results.logz[-1]:.3f}")
     
-    with open('jax_spectral_results.pkl', 'wb') as f:
+    with open(args.out, 'wb') as f:
         pickle.dump(results, f)

@@ -65,7 +65,7 @@ def generate_plots(model):
     
     lnz = results.logz[-1]
     
-    # corner plot
+    # 1. corner plot
     print(f"  -> Generating Corner Plot...")
     try:
         fig, axes = dyplot.cornerplot(results, labels=model["params"], 
@@ -77,15 +77,15 @@ def generate_plots(model):
     except Exception as e:
         print(f"     Failed corner plot: {e}")
 
-    # credible band
-    print(f"  -> Generating Credible Band...")
-    plt.figure(figsize=(9, 7))
-    
-    # Resample
+    # Resample for physical plots
     weights = np.exp(results.logwt - lnz)
     samples = results.samples
     indices = dynesty.utils.resample_equal(np.arange(len(samples)), weights)
-    subset_indices = np.random.choice(indices, 1000) 
+    subset_indices = np.random.choice(indices, 500) # Reduced to 500 for speed
+    
+    # 2. credible band (Mass-Radius)
+    print(f"  -> Generating M-R Credible Band...")
+    plt.figure(figsize=(9, 7))
     
     for i, idx in enumerate(subset_indices):
         params = samples[idx]
@@ -110,8 +110,43 @@ def generate_plots(model):
     plt.savefig(f"{model['prefix']}_band.png", dpi=300, bbox_inches='tight')
     plt.close()
 
+    # 3. credible band (EoS: Pressure vs Density)
+    print(f"  -> Generating EoS Credible Band...")
+    plt.figure(figsize=(9, 7))
+    rho_grid_SI = jnp.logspace(16.5, 18.6, 200) 
+    
+    for i, idx in enumerate(subset_indices):
+        params = samples[idx]
+        pressure_SI = model["phys"].get_eos_properties(rho_grid_SI, params)
+        
+        rho_CGS = np.array(rho_grid_SI) / 1000.0
+        pressure_CGS = np.array(pressure_SI) * 10.0
+        
+        lbl = "Posterior EoS" if i == 0 else None
+        plt.plot(rho_CGS, pressure_CGS, color=model["color"], alpha=0.03, label=lbl)
+
+    rho_nuc_cgs = 2.7e14
+    plt.axvline(rho_nuc_cgs, color='black', linestyle='-.', alpha=0.6, label=r'$\rho_{nuc}$ (Saturation)')
+    
+    # ONLY draw knots for the Polytrope model!
+    if model["name"] == "Standard Polytrope":
+        plt.axvline(1.85 * rho_nuc_cgs, color='black', linestyle=':', alpha=0.6, label=r'$1.85\rho_{nuc}$ (Knot 1)')
+        plt.axvline(3.70 * rho_nuc_cgs, color='black', linestyle=':', alpha=0.4, label=r'$3.70\rho_{nuc}$ (Knot 2)')
+        plt.axvline(7.40 * rho_nuc_cgs, color='black', linestyle=':', alpha=0.2, label=r'$7.40\rho_{nuc}$ (Knot 3)')
+
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlabel(r'Rest Mass Density $\rho$ (g/cm$^3$)', fontsize=14, fontweight='bold')
+    plt.ylabel(r'Pressure $P$ (dyn/cm$^2$)', fontsize=14, fontweight='bold')
+    plt.title(f"{model['name']} Equation of State\n$\ln \mathcal{{Z}} = {lnz:.2f}$", fontsize=16)
+    plt.legend(loc='lower right', fontsize=10)
+    plt.grid(True, which="both", ls="--", alpha=0.3)
+    
+    plt.savefig(f"{model['prefix']}_eos.png", dpi=300, bbox_inches='tight')
+    plt.close()
+
 # loop over models
 for model in MODELS:
     generate_plots(model)
 
-print("\n[DONE] All plots generated.")
+print("\n[DONE] All individual plots generated.")

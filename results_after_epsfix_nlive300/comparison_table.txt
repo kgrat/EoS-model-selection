@@ -1,0 +1,15 @@
+Model                          M_max [Msun] med [90%]      R_1.4 [km] med [90%]            ln Z  ln B vs poly  B vs poly
+Piecewise polytrope   old           3.23 [2.59, 3.75]      12.49 [11.96, 13.16]    -4.81 +/- 0.13          0.00      1.000
+Piecewise polytrope   new           2.95 [2.07, 3.31]      12.43 [11.84, 13.14]    -4.98 +/- 0.15          0.00      1.000
+Hybrid (CSS)          old           2.57 [2.03, 3.40]      12.96 [12.18, 13.50]    -6.85 +/- 0.21         -2.04      0.130
+Hybrid (CSS)          new           2.07 [2.02, 2.54]      12.69 [11.91, 13.65]    -7.22 +/- 0.22         -2.24      0.106
+Spectral              old  14293834307790642734224976912979647072430260161004314144543767135449980223335353102483628657623097079711641420223
+Spectral              new           4.38 [3.10, 5.01]      12.48 [11.76, 13.23]    -6.54 +/- 0.17         -1.56      0.210
+
+Fraction of new posterior draws (first 300) with c_s^2 > c^2 below the max-mass centre:
+  Piecewise polytrope   98%
+  Hybrid (CSS)          0%
+  Spectral              98%
+
+Note: the old spectral M_max/R_1.4 row is not meaningful. 99% of the old spectral posterior draws contain
+integrations that crossed 2Gm/(rc^2) >= 1 (no static star), which the old solver did not detect.

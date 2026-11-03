@@ -1,111 +1,137 @@
-# 🚀 JAX-Accelerated Bayesian Model Selection for Neutron Star EoS
+# JAX-Accelerated Bayesian Model Selection for Neutron Star EoS
 
-A high-performance computational pipeline to determine the internal structure of Neutron Stars. This project utilizes **JAX** (for vectorized differential equation solving) and **Nested Sampling** to rigorously compare competing Equation of State (EoS) theories against multi-messenger data.
+A pipeline that compares three parameterizations of the neutron-star equation of state (EoS) using nested sampling. It uses **JAX** (vectorized TOV integration) and **dynesty** (Bayesian evidence), with astrophysical radius constraints from GW170817 and NICER.
 
-## 🏆 Bayesian Model Selection Results
+## Bayesian Model Selection Results
 
-I performed a rigorous statistical comparison of three major theoretical frameworks. The analysis utilized **LIGO GW170817** (Tidal Deformability) and **NICER** X-ray Pulse Profiling (PSR J0030+0451, PSR J0740+6620) to constrain the stiffness of nuclear matter.
+Three EoS parameterizations are compared: a piecewise polytrope, a hybrid hadron-quark model with a constant speed of sound (CSS), and Lindblom's spectral expansion. The likelihood is an approximation built from one-dimensional radius measurements; see [Likelihood](#likelihood) below.
 
-### 📊 Model Comparison Scoreboard
+### Model comparison
 
-| Rank | Model | Log Evidence ($\ln \mathcal{Z}$) | Bayes Factor ($\mathcal{B}$) | Interpretation |
-| :--- | :--- | :--- | :--- | :--- |
-| 🥇 | **Standard Polytrope** | **-4.81** | **1.0 (Baseline)** | **Statistically Favored** |
-| 🥈 | **Hybrid (Phase Trans.)** | -6.82 | ~1/7 | Allowed, but penalized for complexity |
-| 🥉 | **Spectral (Lindblom)** | -8.69 | ~1/50 | **Disfavored** (Struggles with stiffness) |
+Results with the corrected energy density (see [Changelog](#changelog)). Nested sampling used `nlive=300`, `dlogz=0.5`, the same settings as the earlier results. Medians and 90% intervals are over the posterior.
 
-### 📉 Scientific Conclusion
+| Model | $\ln \mathcal{Z}$ | $\ln \mathcal{B}$ vs polytrope | $\mathcal{B}$ | $M_{max}$ [$M_\odot$] | $R_{1.4}$ [km] |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| Piecewise polytrope | $-4.98 \pm 0.15$ | 0 | 1 | 2.95 [2.07, 3.31] | 12.43 [11.84, 13.14] |
+| Spectral | $-6.54 \pm 0.17$ | $-1.56$ | 0.21 | 4.38 [3.10, 5.01] | 12.48 [11.76, 13.23] |
+| Hybrid (CSS) | $-7.22 \pm 0.22$ | $-2.24$ | 0.11 | 2.07 [2.02, 2.54] | 12.69 [11.91, 13.65] |
 
-The data favors the **Standard Polytrope Model** because it naturally captures the specific "Soft-then-Stiff" evolution required by the tension between LIGO (small radius) and NICER J0740 (high mass).
+The $\pm$ values are `dynesty`'s statistical error on $\ln\mathcal{Z}$ from a single run. They do not include prior or likelihood systematics.
 
-* **Hybrid Models:** While allowed, the data does not yet possess enough precision to statistically demand a sharp phase transition (kink), resulting in an Occam's Razor penalty.
-* **Spectral Models:** The smoothness constraint of the spectral expansion causes unphysical oscillations when attempting to fit the sharp stiffening required at high densities, leading to a poor fit.
+### Interpretation
 
-![Model Comparison Plot](Neutron_Star_Model.png)
+* The three models give nearly the same $R_{1.4} \approx 12.4$-$12.7$ km, because the likelihood constrains $R_{1.4}$ directly.
+* The piecewise polytrope has the highest evidence, but the margins are small: $\ln\mathcal{B} = 1.6$ over the spectral model and $2.2$ over the hybrid model. Differences of this size are modest. They also depend on the prior ranges, which are chosen independently for each model (see PHYSICS.md, Section 5). They should not be read as evidence that one class of dense-matter physics is preferred.
+* Causality is not enforced. About 98% of the polytrope and spectral posterior samples have a sound speed above $c$ somewhere below the central density of the maximum-mass star, which is why their $M_{max}$ values reach 3-5 $M_\odot$. The CSS model is causal by construction ($c_s^2 \le 1$ in its prior), and its posterior sits against the $M_{max} > 2.01\,M_\odot$ cut. Part of its lower evidence probably comes from not being allowed to stiffen past $c$. A causality cut would likely change the ranking.
+* The likelihood itself is an approximation (see below).
 
-## ⚡ Computational Methodology
+![Model Comparison Plot](Neutron_Star_Model_MR.png)
 
-### 1. The Physics Engine (JAX)
-Standard Python ODE solvers (`scipy.integrate`) are too slow for high-dimensional Nested Sampling. I rewrote the **Tolman-Oppenheimer-Volkoff (TOV)** solver from scratch using **JAX**.
-* **Just-In-Time (JIT) Compilation:** The General Relativistic equations are compiled into optimized XLA machine code.
-* **Vectorization (`vmap`):** The solver computes **50+ stars simultaneously** on a single CPU/GPU pass using `jax.vmap`.
-* **Performance:** Reduced likelihood evaluation time from **~0.05s** (SciPy) to **~0.0005s** (JAX), a **100x speedup**.
+## Likelihood
 
-### 2. The Statistical Engine (Nested Sampling)
-* **Algorithm:** Dynamic Nested Sampling via `dynesty`.
-* **Likelihood:** rigorous **Kernel Density Estimation (KDE)** trained on the full posterior chains of GW170817 and NICER datasets. This captures the non-Gaussian "banana" correlations in the observational data that simple Chi-Squared methods miss.
-* **Goal:** Calculate the **Bayesian Evidence ($\mathcal{Z}$)** to perform formal Model Selection.
+The likelihood is a product of one-dimensional kernel density estimates (KDEs) of **neutron-star radius at a fixed mass**:
 
-## 📂 Repository Structure
+* **$R_{1.4}$ from GW170817:** radius samples from the LIGO/Virgo EoS-insensitive analysis (Abbott et al. 2018), restricted to $1.35 < m_1 < 1.45\,M_\odot$. These radii were derived from the measured tidal deformabilities using quasi-universal relations. This project does **not** compute tidal deformabilities or use a $\Lambda$ likelihood.
+* **$R_{1.4}$ from NICER PSR J0030+0451:** radius samples with $1.35 < M < 1.45\,M_\odot$.
+* **$R_{2.08}$ from NICER PSR J0740+6620:** radius samples with $2.0 < M < 2.15\,M_\odot$, applied when the model reaches $M_{max} > 2.08\,M_\odot$.
+* EoSs with $M_{max} < 2.01\,M_\odot$ are rejected.
 
-The project is modularized into **Physics Engines** (JAX logic) and **Runners** (Inference logic).
+This is an approximation. Reducing each mass-radius posterior to a radius distribution in a mass window throws away the mass-radius correlation, and the two $R_{1.4}$ terms are treated as independent. PHYSICS.md lists the full set of limitations.
+
+## Computational Methodology
+
+### The physics engine (JAX)
+The Tolman-Oppenheimer-Volkoff (TOV) equations are integrated with a fixed-step RK4 scheme written in JAX.
+* **JIT compilation:** the TOV integration is compiled with XLA.
+* **Vectorization:** `jax.vmap` solves the 50 stars of one M-R curve in a single call.
+* **Energy density:** the TOV equations use the total energy density $\epsilon(P)$, computed from the first law of thermodynamics for each model (PHYSICS.md, Sections 1-3).
+* **Validation:** `validate_energy_density.py` reproduces the SLy maximum mass and $R_{1.4}$ of Read et al. (2009) to within 0.1% and 0.3%. It also checks continuity of $\epsilon$, $\epsilon \ge \rho c^2$, and causality. Output is in `validation_output.txt`.
+
+### The statistical engine (nested sampling)
+* **Algorithm:** static nested sampling with `dynesty` (`bound='multi'`).
+* **Output:** the Bayesian evidence $\mathcal{Z}$ for each model, and posterior samples.
+
+## Repository Structure
 
 | File | Description |
 | :--- | :--- |
-| [`jax_physics_poly.py`](jax_physics_poly.py) | JAX engine for the **Standard Piecewise Polytrope** (Read et al. 2009). |
-| [`jax_physics_css.py`](jax_physics_css.py) | JAX engine for **Hybrid Stars** with Phase Transitions (CSS Model). |
-| [`jax_physics_spectral.py`](jax_physics_spectral.py) | JAX engine for **Spectral Parameterization** (Lindblom 2010). |
-| [`jax_runner_poly.py`](jax_runner_poly.py) | Execution script for the Standard Polytrope model. |
-| [`jax_runner_css.py`](jax_runner_css.py) | Execution script for the Hybrid (CSS) model. |
-| [`jax_runner_spectral.py`](jax_runner_spectral.py) | Execution script for the Spectral model. |
-| [`plot_final_comparison.py`](plot_final_comparison.py) | Generates the overlay plot and calculates Bayes Factors. |
-| [`generate_individual_plots.py`](generate_individual_plots.py) | Generates detailed Corner plots and Credible Bands for each model. |
-| [`PHYSICS.md`](PHYSICS.md) | Detailed documentation of the equations and parameters used. |
-## 🛠️ Installation & Usage
+| [`jax_physics_poly.py`](jax_physics_poly.py) | JAX engine for the piecewise polytrope (Read et al. 2009). |
+| [`jax_physics_css.py`](jax_physics_css.py) | JAX engine for the hybrid (CSS) model with a first-order phase transition. |
+| [`jax_physics_spectral.py`](jax_physics_spectral.py) | JAX engine for the spectral parameterization (Lindblom 2010). |
+| [`jax_runner_poly.py`](jax_runner_poly.py) | Nested-sampling run for the polytrope. |
+| [`jax_runner_css.py`](jax_runner_css.py) | Nested-sampling run for the CSS model. |
+| [`jax_runner_spectral.py`](jax_runner_spectral.py) | Nested-sampling run for the spectral model. |
+| [`plot_comparison_model.py`](plot_comparison_model.py) | Overlay plot of the three models and their Bayes factors. |
+| [`individual_plots.py`](individual_plots.py) | Corner plots and credible bands for each model. |
+| [`validate_energy_density.py`](validate_energy_density.py) | SLy benchmark, $\epsilon$ continuity and causality checks. |
+| [`compare_before_after_epsfix.py`](compare_before_after_epsfix.py) | Old vs new comparison for the energy-density fix. |
+| [`PHYSICS.md`](PHYSICS.md) | Equations, models, priors and likelihood. |
+| `results_before_epsfix/` | Results, plots and engines from before the energy-density fix. |
+
+## Installation and Usage
 
 ### 1. Prerequisites
-You need a Python environment with JAX installed.
 ```bash
 pip install numpy scipy matplotlib dynesty jax jaxlib
 ```
-### 2. Running the Analysis
-To reproduce the results, run the inference scripts for each model. (Note: These may take 10-20 minutes depending on CPU core count).
+
+### 2. Running the analysis
+Each runner takes `--nlive` (default 1500), `--dlogz` (default 0.1) and `--out` (default `jax_<model>_results.pkl`).
 
 ```bash
-# Run Standard Model
 python jax_runner_poly.py
-
-# Run Hybrid (Phase Transition) Model
 python jax_runner_css.py
-
-# Run Spectral Model
 python jax_runner_spectral.py
 ```
-### 3. Generating Plots
-Once the .pkl result files are generated, run the plotting scripts:
+
+### 3. Validation and plots
 
 ```bash
-# Generate the Master Comparison (The Money Plot)
-python plot_final_comparison.py
-
-# Generate individual corner plots and bands
-python generate_individual_plots.py
+python validate_energy_density.py
+python plot_comparison_model.py
+python individual_plots.py
 ```
 
-## References and Data Sources:
-Observational Data:
+## Changelog
 
-* LIGO GW170817: Abbott, B. P., et al., Phys. Rev. Lett. 119, 161101 (2017). LIGO Open Science Center
+**Energy-density correction (fix-energy-density branch).**
 
-* NICER PSR J0030+0451: Miller, M. C., et al., Astrophys. J. Lett. 887,L24 (2019).
+* **TOV equations.** The solvers used the rest-mass density $\rho$ where the TOV equations need the total energy density $\epsilon/c^2$: in $dm/dr$, in the $(\epsilon + P)$ factor of $dP/dr$, and in the central conditions. All three engines now integrate with $\epsilon(P)$:
+  * Polytrope: $\epsilon = (1+a_i)\rho c^2 + K_i\rho^{\Gamma_i}/(\Gamma_i - 1)$ per segment, with $a_i$ fixed by continuity (Read et al. 2009).
+  * CSS: the same for the crust and hadronic phase. The latent-heat jump starts from the corrected $\epsilon_h(P_{trans})$, and stars are labelled by central energy density.
+  * Spectral: $\epsilon(P)$ from Lindblom's integral formula, tabulated once per parameter set. It previously started from a single-$\Gamma$ estimate anchored at $\rho c^2$.
+* **Horizon check.** Integrations that reach $2Gm/(rc^2) \ge 1$ are now returned as NaN and dropped. Previously, a clamp let them continue and produce stars with unbounded mass. These spurious "stars" passed the $M_{max}$ cut and gave plausible-looking $R_{1.4}$ values. They affected 99% of the earlier spectral posterior and none of the polytrope or CSS posteriors.
+* **Validation.** `validate_energy_density.py` reproduces SLy: $M_{max} = 2.048$ vs 2.049 and $R_{1.4} = 11.70$ vs 11.74 km (Read et al. 2009). The old solver gives 2.46 and 12.20 km for the same EoS.
+* **Effect on the results** (old, then new; nested sampling at `nlive=300`, `dlogz=0.5` both times):
 
-* NICER PSR J0740+6620: Miller, M. C., et al., Astrophys. J. Lett. 918, L28 (2021).
+  | Model | $M_{max}$ old | $M_{max}$ new | $R_{1.4}$ old | $R_{1.4}$ new | $\ln\mathcal{Z}$ old | $\ln\mathcal{Z}$ new |
+  | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+  | Polytrope | 3.23 [2.59, 3.75] | 2.95 [2.07, 3.31] | 12.49 [11.96, 13.16] | 12.43 [11.84, 13.14] | $-4.81 \pm 0.13$ | $-4.98 \pm 0.15$ |
+  | CSS | 2.57 [2.03, 3.40] | 2.07 [2.02, 2.54] | 12.96 [12.18, 13.50] | 12.69 [11.91, 13.65] | $-6.85 \pm 0.21$ | $-7.22 \pm 0.22$ |
+  | Spectral | not meaningful (horizon artifact) | 4.38 [3.10, 5.01] | not meaningful | 12.48 [11.76, 13.23] | $-8.69 \pm 0.23$ | $-6.54 \pm 0.17$ |
 
-Theoretical Models:
+  The polytrope still has the highest evidence. The earlier statement that the spectral model is disfavored came from the horizon artifact: its $\ln\mathcal{B}$ against the polytrope went from $-3.9$ to $-1.6$, and it now sits above the CSS model. Old results, plots and engines are kept in `results_before_epsfix/`.
+* **Documentation.** The README and PHYSICS.md now describe the likelihood as 1D radius KDEs (not a tidal-deformability likelihood). The parameter and prior tables are corrected, and the script names are fixed.
 
-* Piecewise Polytrope: Read, J. S., et al., Phys. Rev. D 79, 124032 (2009).
+## References and Data Sources
 
-* Spectral Decomposition: Lindblom, L., Phys. Rev. D 82, 103011 (2010).
+Observational data:
 
-* CSS Model (Hybrid): Alford, M. G., Han, S., & Prakash, M., Phys. Rev. D 88, 083013 (2013).
+* LIGO/Virgo GW170817: Abbott, B. P., et al., Phys. Rev. Lett. 121, 161101 (2018).
+* NICER PSR J0030+0451: Miller, M. C., et al., ApJL 887, L24 (2019); Riley, T. E., et al., ApJL 887, L21 (2019).
+* NICER PSR J0740+6620: Miller, M. C., et al., ApJL 918, L28 (2021); Riley, T. E., et al., ApJL 918, L27 (2021).
 
-Tools:
+Theoretical models:
 
-* Dynesty
+* Piecewise polytrope: Read, J. S., et al., Phys. Rev. D 79, 124032 (2009).
+* Spectral decomposition: Lindblom, L., Phys. Rev. D 82, 103011 (2010).
+* CSS (hybrid): Alford, M. G., Han, S., & Prakash, M., Phys. Rev. D 88, 083013 (2013).
 
-* JAX
+Tools: dynesty, JAX.
 
-## 🔮 Future Roadmap
+## Future Roadmap
+
+* Likelihood: use the full two-dimensional mass-radius posteriors instead of radius-at-fixed-mass KDEs, compute tidal deformabilities to use the GW170817 $\Lambda$ posterior directly, and add a causality cut.
 
 * Rotation: Implement the Hartle-Thorne approximation in JAX to analyze rapidly rotating remnants (e.g., GW190814) where spherical symmetry breaks down.
 
