@@ -198,3 +198,17 @@ def compute_curve_from_segments(seg, rhos):
 def compute_curve_jax(params, n_points=50):
     rhos = jnp.logspace(17.3, 18.6, n_points)
     return compute_curve_from_segments(build_segments(params), rhos)
+
+@partial(jax.jit, static_argnames=['n_points'])
+def central_pressures(params, n_points=50):
+    """Central pressure of each star on the compute_curve_jax grid."""
+    seg = build_segments(params)
+    return jnp.vectorize(lambda r: pressure_of_rho(r, seg))(jnp.logspace(17.3, 18.6, n_points))
+
+@jax.jit
+def max_cs2_up_to(params, P_max):
+    """Max c_s^2/c^2 for P <= P_max. Within a segment c_s^2 grows with P, so segment tops are included."""
+    seg = build_segments(params)
+    Ps = jnp.concatenate([jnp.logspace(30.0, jnp.log10(P_max), 400),
+                          jnp.minimum(seg[1][1:] * (1 - 1e-9), P_max)])
+    return jnp.max(jnp.vectorize(lambda P: cs2_of_P(P, seg))(Ps))

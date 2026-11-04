@@ -8,21 +8,21 @@ Three EoS parameterizations are compared: a piecewise polytrope, a hybrid hadron
 
 ### Model comparison
 
-Results with the corrected energy density (see [Changelog](#changelog)). Nested sampling used `nlive=300`, `dlogz=0.5`, the same settings as the earlier results. Medians and 90% intervals are over the posterior.
+Results with the corrected energy density and physical cuts (causality, monotonic pressure, stable-branch radii; see [Changelog](#changelog)). Nested sampling used `nlive=300`, `dlogz=0.5`. Medians and 90% intervals are over the posterior.
 
-| Model | $\ln \mathcal{Z}$ | $\ln \mathcal{B}$ vs polytrope | $\mathcal{B}$ | $M_{max}$ [$M_\odot$] | $R_{1.4}$ [km] |
+| Model | $\ln \mathcal{Z}$ | $\ln \mathcal{B}$ vs CSS | $\mathcal{B}$ vs CSS | $M_{max}$ [$M_\odot$] | $R_{1.4}$ [km] |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| Piecewise polytrope | $-4.98 \pm 0.15$ | 0 | 1 | 2.95 [2.07, 3.31] | 12.43 [11.84, 13.14] |
-| Spectral | $-6.54 \pm 0.17$ | $-1.56$ | 0.21 | 4.38 [3.10, 5.01] | 12.48 [11.76, 13.23] |
-| Hybrid (CSS) | $-7.22 \pm 0.22$ | $-2.24$ | 0.11 | 2.07 [2.02, 2.54] | 12.69 [11.91, 13.65] |
+| Hybrid (CSS) | $-7.82 \pm 0.21$ | 0 | 1 | 2.31 [2.12, 2.59] | 12.72 [12.05, 13.52] |
+| Piecewise polytrope | $-8.64 \pm 0.23$ | $-0.82$ | 0.44 | 2.24 [2.11, 2.37] | 12.68 [12.03, 13.28] |
+| Spectral | $-10.78 \pm 0.27$ | $-2.96$ | 0.05 | 2.30 [2.08, 2.66] | 12.76 [12.14, 13.41] |
 
 The $\pm$ values are `dynesty`'s statistical error on $\ln\mathcal{Z}$ from a single run. They do not include prior or likelihood systematics.
 
 ### Interpretation
 
-* The three models give nearly the same $R_{1.4} \approx 12.4$-$12.7$ km, because the likelihood constrains $R_{1.4}$ directly.
-* The piecewise polytrope has the highest evidence, but the margins are small: $\ln\mathcal{B} = 1.6$ over the spectral model and $2.2$ over the hybrid model. Differences of this size are modest. They also depend on the prior ranges, which are chosen independently for each model (see PHYSICS.md, Section 5). They should not be read as evidence that one class of dense-matter physics is preferred.
-* Causality is not enforced. About 98% of the polytrope and spectral posterior samples have a sound speed above $c$ somewhere below the central density of the maximum-mass star, which is why their $M_{max}$ values reach 3-5 $M_\odot$. The CSS model is causal by construction ($c_s^2 \le 1$ in its prior), and its posterior sits against the $M_{max} > 2.01\,M_\odot$ cut. Part of its lower evidence probably comes from not being allowed to stiffen past $c$. A causality cut would likely change the ranking.
+* All three models agree on the neutron-star properties: $R_{1.4} \approx 12.7$ km and $M_{max} \approx 2.2$-$2.3\,M_\odot$. The data constrain these quantities, not the choice of parameterization.
+* The CSS and polytrope evidences differ by $\ln\mathcal{B} = 0.8$, which is not a meaningful preference. The spectral model is lower by about 3 against CSS.
+* Most of the evidence differences come from how much of each model's prior is physical. The causality and monotonic-pressure cuts remove prior volume without renormalizing it, so a model whose prior is mostly acausal (as for the spectral and polytrope priors here) is penalized for that. The CSS prior keeps the quark phase causal by construction. With different prior ranges the ordering could change, so these numbers should not be read as evidence for or against a phase transition.
 * The likelihood itself is an approximation (see below).
 
 ![Model Comparison Plot](Neutron_Star_Model_MR.png)
@@ -33,8 +33,9 @@ The likelihood is a product of one-dimensional kernel density estimates (KDEs) o
 
 * **$R_{1.4}$ from GW170817:** radius samples from the LIGO/Virgo EoS-insensitive analysis (Abbott et al. 2018), restricted to $1.35 < m_1 < 1.45\,M_\odot$. These radii were derived from the measured tidal deformabilities using quasi-universal relations. This project does **not** compute tidal deformabilities or use a $\Lambda$ likelihood.
 * **$R_{1.4}$ from NICER PSR J0030+0451:** radius samples with $1.35 < M < 1.45\,M_\odot$.
-* **$R_{2.08}$ from NICER PSR J0740+6620:** radius samples with $2.0 < M < 2.15\,M_\odot$, applied when the model reaches $M_{max} > 2.08\,M_\odot$.
-* EoSs with $M_{max} < 2.01\,M_\odot$ are rejected.
+* **NICER PSR J0740+6620:** radius KDE from samples with $2.0 < M < 2.15\,M_\odot$, averaged over the pulsar's mass distribution in that window. Masses the EoS cannot reach contribute zero.
+* Radii are read off the stable branch of the M-R curve.
+* EoSs with $M_{max} < 2.01\,M_\odot$, acausal EoSs ($c_s > c$ below the maximum-mass central pressure), and polytropes with decreasing pressure are rejected.
 
 This is an approximation. Reducing each mass-radius posterior to a radius distribution in a mass window throws away the mass-radius correlation, and the two $R_{1.4}$ terms are treated as independent. PHYSICS.md lists the full set of limitations.
 
@@ -64,9 +65,12 @@ The Tolman-Oppenheimer-Volkoff (TOV) equations are integrated with a fixed-step 
 | [`plot_comparison_model.py`](plot_comparison_model.py) | Overlay plot of the three models and their Bayes factors. |
 | [`individual_plots.py`](individual_plots.py) | Corner plots and credible bands for each model. |
 | [`validate_energy_density.py`](validate_energy_density.py) | SLy benchmark, $\epsilon$ continuity and causality checks. |
-| [`compare_before_after_epsfix.py`](compare_before_after_epsfix.py) | Old vs new comparison for the energy-density fix. |
+| [`eos_likelihood.py`](eos_likelihood.py) | Shared likelihood: KDEs, stable-branch radii, physical cuts. |
+| [`compare_before_after_epsfix.py`](compare_before_after_epsfix.py) | Old vs new comparison (pass the new results folder). |
 | [`PHYSICS.md`](PHYSICS.md) | Equations, models, priors and likelihood. |
 | `results_before_epsfix/` | Results, plots and engines from before the energy-density fix. |
+| `results_after_epsfix_nlive300/` | Results with the energy-density fix only (no physical cuts). |
+| `results_physcuts_nlive300/` | Results with the energy-density fix and physical cuts (the current results). |
 
 ## Installation and Usage
 
@@ -93,6 +97,22 @@ python individual_plots.py
 ```
 
 ## Changelog
+
+**Physical cuts and likelihood fixes.**
+
+* **Causality.** EoSs with $c_s^2 = dP/d\epsilon > c^2$ anywhere below the central pressure of the maximum-mass star are rejected. Before this change, about 98% of the polytrope and spectral posteriors were acausal, which is where their $M_{max}$ of 3-5 $M_\odot$ came from.
+* **Monotonic pressure.** Polytropes with $P_2 \le P_1$ or $P_3 \le P_2$ ($\Gamma \le 0$ segment) are rejected. They made up 7-9% of the earlier posterior.
+* **Stable branch.** $R_{1.4}$ and the J0740 radii are read off the stable branch only. Previously the whole curve, including stars past $M_{max}$, was sorted by mass and interpolated.
+* **J0740.** The J0740 term is averaged over the pulsar's mass distribution. Previously it was evaluated at 2.08 $M_\odot$ and skipped entirely for EoSs with $2.01 < M_{max} < 2.08\,M_\odot$, which treated them as a perfect fit.
+* **Effect** (energy-density fix only, then with the cuts; nested sampling at `nlive=300`, `dlogz=0.5`):
+
+  | Model | $\ln\mathcal{Z}$ | $\ln\mathcal{Z}$ with cuts | $M_{max}$ with cuts | $R_{1.4}$ with cuts |
+  | :--- | :--- | :--- | :--- | :--- |
+  | Polytrope | $-4.98 \pm 0.15$ | $-8.64 \pm 0.23$ | 2.24 [2.11, 2.37] | 12.68 [12.03, 13.28] |
+  | CSS | $-7.22 \pm 0.22$ | $-7.82 \pm 0.21$ | 2.31 [2.12, 2.59] | 12.72 [12.05, 13.52] |
+  | Spectral | $-6.54 \pm 0.17$ | $-10.78 \pm 0.27$ | 2.30 [2.08, 2.66] | 12.76 [12.14, 13.41] |
+
+  The polytrope and spectral evidences drop by about 4, because most of their prior volume was acausal. The CSS model, causal by construction, now has the highest evidence, but only by 0.8 over the polytrope.
 
 **Energy-density correction (fix-energy-density branch).**
 
@@ -131,7 +151,7 @@ Tools: dynesty, JAX.
 
 ## Future Roadmap
 
-* Likelihood: use the full two-dimensional mass-radius posteriors instead of radius-at-fixed-mass KDEs, compute tidal deformabilities to use the GW170817 $\Lambda$ posterior directly, and add a causality cut.
+* Likelihood: use the full two-dimensional mass-radius posteriors instead of radius-at-fixed-mass KDEs, and compute tidal deformabilities to use the GW170817 $\Lambda$ posterior directly.
 
 * Rotation: Implement the Hartle-Thorne approximation in JAX to analyze rapidly rotating remnants (e.g., GW190814) where spherical symmetry breaks down.
 

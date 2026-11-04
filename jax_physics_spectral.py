@@ -162,6 +162,19 @@ def compute_curve_jax(params, n_points=50):
     masses, radii = jax.vmap(solve_one_star, in_axes=(0, None))(ps, tb)
     return masses, radii
 
+@partial(jax.jit, static_argnames=['n_points'])
+def central_pressures(params, n_points=50):
+    """Central pressure of each star on the compute_curve_jax grid."""
+    return jnp.logspace(33.5, 36.5, n_points)
+
+@jax.jit
+def max_cs2_up_to(params, P_max):
+    """Max c_s^2/c^2 for P <= P_max (Gamma(P) is arbitrary here, so a dense grid is used)."""
+    tb = build_tables(params)
+    Ps = jnp.concatenate([jnp.logspace(30.0, jnp.log10(P_max), 1000), jnp.array([P_STITCH * (1 - 1e-9)])])
+    Ps = jnp.minimum(Ps, P_max)
+    return jnp.max(jnp.vectorize(lambda P: cs2_of_P(P, tb))(Ps))
+
 @jax.jit
 def get_eos_properties(rho_grid, params):
     """

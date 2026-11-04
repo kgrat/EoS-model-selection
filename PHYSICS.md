@@ -98,25 +98,30 @@ With $x$ reaching about 10 at the highest central pressures, the cubic term can 
 
 ## 4. Observational likelihood
 
-The likelihood is an approximation built from one-dimensional kernel density estimates (KDEs) of **radius at a fixed mass**. It is not a tidal-deformability likelihood.
+The likelihood (`eos_likelihood.py`) is an approximation built from one-dimensional kernel density estimates (KDEs) of **radius at a fixed mass**. It is not a tidal-deformability likelihood.
 
 $$
-\ln\mathcal{L}(\theta) = \ln \hat p_{GW}(R_{1.4}) + \ln \hat p_{J0030}(R_{1.4}) + \ln \hat p_{J0740}(R_{2.08})
+\ln\mathcal{L}(\theta) = \ln \hat p_{GW}(R_{1.4}) + \ln \hat p_{J0030}(R_{1.4}) + \ln \left\langle \hat p_{J0740}\big(R(M)\big) \right\rangle_{M}
 $$
 
 * $\hat p_{GW}$: KDE of the GW170817 radius samples from the EoS-insensitive analysis (Abbott et al. 2018), using the samples with $1.35 < m_1 < 1.45\,M_\odot$. These radii were derived from the measured tidal deformabilities with EoS-insensitive (quasi-universal) relations, so $\Lambda$ enters only through that external step.
 * $\hat p_{J0030}$: KDE of NICER PSR J0030+0451 radius samples with $1.35 < M < 1.45\,M_\odot$.
-* $\hat p_{J0740}$: KDE of NICER PSR J0740+6620 radius samples with $2.0 < M < 2.15\,M_\odot$. Only applied if $M_{max} > 2.08\,M_\odot$.
+* $\hat p_{J0740}$: KDE of NICER PSR J0740+6620 radius samples with $2.0 < M < 2.15\,M_\odot$. It is averaged over the pulsar's mass distribution in that window, using 200 quantiles of the mass samples. Masses the EoS cannot reach contribute zero. An EoS whose $M_{max}$ only just exceeds $2.01\,M_\odot$ is therefore partly penalized, rather than having the term skipped. For EoSs that reach $2.15\,M_\odot$ the term equals $\ln\hat p_{J0740}(R_{2.08})$ to within about 0.01.
 
-$R_{1.4}$ and $R_{2.08}$ are interpolated on each model's M-R curve. EoSs with $M_{max} < 2.01\,M_\odot$ get $\ln\mathcal{L} \approx -10^{10}$.
+$R(M)$ is read off the **stable branch**: the stretches of the M-R curve where $M$ increases with central density. Where several stable branches contain the same mass (twin stars), the lowest-density one is used.
 
-Limitations:
+**Physical cuts.** The cuts below are applied as $\ln\mathcal{L} \approx -10^{10}$, with a small slope toward the allowed region:
 
-1. Mass-radius posteriors are reduced to a radius distribution in a mass window, so the mass-radius correlation within each measurement is discarded.
+1. $M_{max} < 2.01\,M_\odot$.
+2. **Causality:** $c_s^2 = dP/d\epsilon > c^2$ anywhere below the central pressure of the maximum-mass star.
+3. **Monotonic pressure** (polytrope): $P_1 < P_2 < P_3$, so every segment has $\Gamma > 0$.
+
+These cuts remove prior volume without renormalizing the prior. The evidence therefore includes the fraction of each model's prior that is physical: a model that spends most of its prior on acausal EoSs is penalized for it.
+
+Remaining limitations:
+
+1. Mass-radius posteriors are reduced to radius distributions, so the mass-radius correlation within each measurement is discarded.
 2. The GW170817 and J0030 terms both constrain $R_{1.4}$ and are multiplied as if independent.
-3. EoSs with $2.01 < M_{max} < 2.08\,M_\odot$ skip the J0740 term entirely instead of being scored on it.
-4. No causality cut is applied ($c_s > c$ is allowed).
-5. The M-R curve includes points past the maximum mass (unstable branch) when interpolating.
 
 ## 5. Bayesian model selection
 
@@ -152,7 +157,7 @@ All priors are uniform over the ranges below (from the `prior_transform` functio
 | | $\gamma_2$ | $[-0.2, 0.2]$ |
 | | $\gamma_3$ | $[-0.1, 0.1]$ |
 
-The polytrope prior allows $P_2 < P_1$ or $P_3 < P_2$ (a segment with $\Gamma < 0$, where pressure falls as density rises). The JAX code does not reject these, and for them the inverse map $P \to \rho$ is not well defined. The emcee version in `bayesian-inference-eos` rejects them.
+The polytrope prior ranges overlap, so they include $P_2 \le P_1$ or $P_3 \le P_2$ (a segment with $\Gamma \le 0$). These are rejected by the likelihood (Section 4).
 
 ## 7. Validation
 
@@ -160,7 +165,7 @@ The polytrope prior allows $P_2 < P_1$ or $P_3 < P_2$ (a segment with $\Gamma < 
 
 * SLy (Read et al. 2009, Tables II-III, 4-piece crust plus 3-piece core): $M_{max} = 2.048\,M_\odot$ and $R_{1.4} = 11.70$ km, against the published 2.049 and 11.736 km. The old $\rho$-based TOV gives 2.456 and 12.20 km for the same EoS. An independent `scipy` DOP853 solver agrees with the JAX RK4 solver to 0.001% in $M_{max}$ and 13 m in $R_{1.4}$.
 * $\epsilon$ is continuous at every segment boundary to $10^{-12}$ or better, and the CSS jump equals $\Delta\epsilon$.
-* $\epsilon \ge \rho c^2$ everywhere; any causality violations are listed.
+* $\epsilon \ge \rho c^2$ everywhere. Causality is reported here and enforced in the likelihood.
 
 ## References
 

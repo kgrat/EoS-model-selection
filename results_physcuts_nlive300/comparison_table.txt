@@ -1,0 +1,15 @@
+Model                          M_max [Msun] med [90%]      R_1.4 [km] med [90%]            ln Z  ln B vs poly  B vs poly
+Piecewise polytrope   old           3.23 [2.59, 3.75]      12.49 [11.96, 13.16]    -4.81 +/- 0.13          0.00      1.000
+Piecewise polytrope   new           2.24 [2.11, 2.37]      12.68 [12.03, 13.28]    -8.64 +/- 0.23          0.00      1.000
+Hybrid (CSS)          old           2.57 [2.03, 3.40]      12.96 [12.18, 13.50]    -6.85 +/- 0.21         -2.04      0.130
+Hybrid (CSS)          new           2.31 [2.12, 2.59]      12.72 [12.05, 13.52]    -7.82 +/- 0.21          0.82      2.277
+Spectral              old  14293834307790642734224976912979647072430260161004314144543767135449980223335353102483628657623097079711641420223
+Spectral              new           2.30 [2.08, 2.66]      12.76 [12.14, 13.41]   -10.78 +/- 0.27         -2.14      0.117
+
+Fraction of new posterior draws (first 300) with c_s^2 > c^2 below the max-mass centre:
+  Piecewise polytrope   0%
+  Hybrid (CSS)          0%
+  Spectral              0%
+
+old = pre-fix results (results_before_epsfix/); new = energy-density fix + causality cut, monotonic pressure,
+stable-branch radii and mass-marginalized J0740. The old spectral row is not meaningful (horizon artifact).

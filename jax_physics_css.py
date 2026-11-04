@@ -209,3 +209,17 @@ def compute_curve_jax(params, n_points=50):
     masses, radii = jax.vmap(solve_one_star, in_axes=(0, None))(eps_ms, tb)
 
     return masses, radii
+
+@partial(jax.jit, static_argnames=['n_points'])
+def central_pressures(params, n_points=50):
+    """Central pressure of each star on the compute_curve_jax grid."""
+    tb = build_tables(params)
+    return jnp.vectorize(lambda e: P_of_eps(e * c**2, tb))(jnp.logspace(17.3, 18.6, n_points))
+
+@jax.jit
+def max_cs2_up_to(params, P_max):
+    """Max c_s^2/c^2 for P <= P_max. Hadronic c_s^2 grows with P, so P_STITCH- and P_trans- are included."""
+    tb = build_tables(params)
+    Ps = jnp.concatenate([jnp.logspace(30.0, jnp.log10(P_max), 400),
+                          jnp.minimum(jnp.array([P_STITCH, tb['P_trans']]) * (1 - 1e-9), P_max)])
+    return jnp.max(jnp.vectorize(lambda P: cs2_of_P(P, tb))(Ps))
