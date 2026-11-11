@@ -8,7 +8,7 @@ Three EoS parameterizations are compared: a piecewise polytrope, a hybrid hadron
 
 ### Model comparison
 
-Results with the corrected energy density and physical cuts (causality, monotonic pressure, stable-branch radii; see [Changelog](#changelog)). Nested sampling used `nlive=300`, `dlogz=0.5`. Medians and 90% intervals are over the posterior.
+Results with the corrected energy density and physical cuts (causality, monotonic pressure, stable-branch radii; see [Corrections](#corrections)). Nested sampling used `nlive=300`, `dlogz=0.5`. Medians and 90% intervals are over the posterior.
 
 | Model | $\ln \mathcal{Z}$ | $\ln \mathcal{B}$ vs CSS | $\mathcal{B}$ vs CSS | $M_{max}$ [$M_\odot$] | $R_{1.4}$ [km] |
 | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -66,11 +66,7 @@ The Tolman-Oppenheimer-Volkoff (TOV) equations are integrated with a fixed-step 
 | [`individual_plots.py`](individual_plots.py) | Corner plots and credible bands for each model. |
 | [`validate_energy_density.py`](validate_energy_density.py) | SLy benchmark, $\epsilon$ continuity and causality checks. |
 | [`eos_likelihood.py`](eos_likelihood.py) | Shared likelihood: KDEs, stable-branch radii, physical cuts. |
-| [`compare_before_after_epsfix.py`](compare_before_after_epsfix.py) | Old vs new comparison (pass the new results folder). |
 | [`PHYSICS.md`](PHYSICS.md) | Equations, models, priors and likelihood. |
-| `results_before_epsfix/` | Results, plots and engines from before the energy-density fix. |
-| `results_after_epsfix_nlive300/` | Results with the energy-density fix only (no physical cuts). |
-| `results_physcuts_nlive300/` | Results with the energy-density fix and physical cuts (the current results). |
 
 ## Installation and Usage
 
@@ -80,7 +76,7 @@ pip install numpy scipy matplotlib dynesty jax jaxlib
 ```
 
 ### 2. Running the analysis
-Each runner takes `--nlive` (default 1500), `--dlogz` (default 0.1) and `--out` (default `jax_<model>_results.pkl`).
+Each runner takes `--nlive` (default 1500), `--dlogz` (default 0.1) and `--out` (default `jax_<model>_results.pkl`). The results above used `--nlive 300 --dlogz 0.5`.
 
 ```bash
 python jax_runner_poly.py
@@ -96,42 +92,19 @@ python plot_comparison_model.py
 python individual_plots.py
 ```
 
-## Changelog
+## Corrections
 
-**Physical cuts and likelihood fixes.**
+An earlier version of this pipeline had errors that changed its conclusions. They are fixed in the current code, and the results above come from the corrected version.
 
-* **Causality.** EoSs with $c_s^2 = dP/d\epsilon > c^2$ anywhere below the central pressure of the maximum-mass star are rejected. Before this change, about 98% of the polytrope and spectral posteriors were acausal, which is where their $M_{max}$ of 3-5 $M_\odot$ came from.
-* **Monotonic pressure.** Polytropes with $P_2 \le P_1$ or $P_3 \le P_2$ ($\Gamma \le 0$ segment) are rejected. They made up 7-9% of the earlier posterior.
-* **Stable branch.** $R_{1.4}$ and the J0740 radii are read off the stable branch only. Previously the whole curve, including stars past $M_{max}$, was sorted by mass and interpolated.
-* **J0740.** The J0740 term is averaged over the pulsar's mass distribution. Previously it was evaluated at 2.08 $M_\odot$ and skipped entirely for EoSs with $2.01 < M_{max} < 2.08\,M_\odot$, which treated them as a perfect fit.
-* **Effect** (energy-density fix only, then with the cuts; nested sampling at `nlive=300`, `dlogz=0.5`):
+* **Energy density in the TOV equations.** The solvers used the rest-mass density $\rho$ where the TOV equations need the total energy density $\epsilon$. Each model now computes $\epsilon(P)$ from the first law of thermodynamics (PHYSICS.md, Section 2). For SLy, the old solver gave $M_{max} = 2.46\,M_\odot$; the corrected one gives 2.048, against the published 2.049.
+* **Horizon handling.** Integrations that crossed $2Gm/(rc^2) = 1$ were not stopped and produced spurious stars. These dominated the earlier spectral posterior, so the earlier conclusion that the spectral model is disfavored was an artifact.
+* **Physical cuts.** Causality and monotonic pressure were not enforced, and radii were interpolated across the unstable branch. Before the causality cut, most polytrope and spectral posterior samples were acausal, with $M_{max}$ of 3-5 $M_\odot$.
 
-  | Model | $\ln\mathcal{Z}$ | $\ln\mathcal{Z}$ with cuts | $M_{max}$ with cuts | $R_{1.4}$ with cuts |
-  | :--- | :--- | :--- | :--- | :--- |
-  | Polytrope | $-4.98 \pm 0.15$ | $-8.64 \pm 0.23$ | 2.24 [2.11, 2.37] | 12.68 [12.03, 13.28] |
-  | CSS | $-7.22 \pm 0.22$ | $-7.82 \pm 0.21$ | 2.31 [2.12, 2.59] | 12.72 [12.05, 13.52] |
-  | Spectral | $-6.54 \pm 0.17$ | $-10.78 \pm 0.27$ | 2.30 [2.08, 2.66] | 12.76 [12.14, 13.41] |
+Earlier versions reported the polytrope as the preferred model ($\ln\mathcal{Z} = -4.8$, against $-6.9$ for CSS and $-8.7$ for spectral). With the corrections, the three models have comparable evidence, and the ordering mostly reflects prior volume (see [Interpretation](#interpretation)). The pre-correction results and comparison scripts are kept under the git tag `epsfix-comparison-archive`.
 
-  The polytrope and spectral evidences drop by about 4, because most of their prior volume was acausal. The CSS model, causal by construction, now has the highest evidence, but only by 0.8 over the polytrope.
+## Acknowledgments
 
-**Energy-density correction (fix-energy-density branch).**
-
-* **TOV equations.** The solvers used the rest-mass density $\rho$ where the TOV equations need the total energy density $\epsilon/c^2$: in $dm/dr$, in the $(\epsilon + P)$ factor of $dP/dr$, and in the central conditions. All three engines now integrate with $\epsilon(P)$:
-  * Polytrope: $\epsilon = (1+a_i)\rho c^2 + K_i\rho^{\Gamma_i}/(\Gamma_i - 1)$ per segment, with $a_i$ fixed by continuity (Read et al. 2009).
-  * CSS: the same for the crust and hadronic phase. The latent-heat jump starts from the corrected $\epsilon_h(P_{trans})$, and stars are labelled by central energy density.
-  * Spectral: $\epsilon(P)$ from Lindblom's integral formula, tabulated once per parameter set. It previously started from a single-$\Gamma$ estimate anchored at $\rho c^2$.
-* **Horizon check.** Integrations that reach $2Gm/(rc^2) \ge 1$ are now returned as NaN and dropped. Previously, a clamp let them continue and produce stars with unbounded mass. These spurious "stars" passed the $M_{max}$ cut and gave plausible-looking $R_{1.4}$ values. They affected 99% of the earlier spectral posterior and none of the polytrope or CSS posteriors.
-* **Validation.** `validate_energy_density.py` reproduces SLy: $M_{max} = 2.048$ vs 2.049 and $R_{1.4} = 11.70$ vs 11.74 km (Read et al. 2009). The old solver gives 2.46 and 12.20 km for the same EoS.
-* **Effect on the results** (old, then new; nested sampling at `nlive=300`, `dlogz=0.5` both times):
-
-  | Model | $M_{max}$ old | $M_{max}$ new | $R_{1.4}$ old | $R_{1.4}$ new | $\ln\mathcal{Z}$ old | $\ln\mathcal{Z}$ new |
-  | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-  | Polytrope | 3.23 [2.59, 3.75] | 2.95 [2.07, 3.31] | 12.49 [11.96, 13.16] | 12.43 [11.84, 13.14] | $-4.81 \pm 0.13$ | $-4.98 \pm 0.15$ |
-  | CSS | 2.57 [2.03, 3.40] | 2.07 [2.02, 2.54] | 12.96 [12.18, 13.50] | 12.69 [11.91, 13.65] | $-6.85 \pm 0.21$ | $-7.22 \pm 0.22$ |
-  | Spectral | not meaningful (horizon artifact) | 4.38 [3.10, 5.01] | not meaningful | 12.48 [11.76, 13.23] | $-8.69 \pm 0.23$ | $-6.54 \pm 0.17$ |
-
-  The polytrope still has the highest evidence. The earlier statement that the spectral model is disfavored came from the horizon artifact: its $\ln\mathcal{B}$ against the polytrope went from $-3.9$ to $-1.6$, and it now sits above the CSS model. Old results, plots and engines are kept in `results_before_epsfix/`.
-* **Documentation.** The README and PHYSICS.md now describe the likelihood as 1D radius KDEs (not a tidal-deformability likelihood). The parameter and prior tables are corrected, and the script names are fixed.
+The project design, model choices and original implementation are my own. I used Claude (Anthropic), an AI coding assistant, to help find and fix the bugs listed under [Corrections](#corrections), to write the validation tests for those fixes (`validate_energy_density.py`), and to correct the documentation.
 
 ## References and Data Sources
 

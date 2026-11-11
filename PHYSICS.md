@@ -14,7 +14,7 @@ $$
 \frac{dP}{dr} = -\frac{G\left(\epsilon/c^2 + P/c^2\right)\left(m + 4\pi r^3 P/c^2\right)}{r^2\left(1 - 2Gm/(rc^2)\right)}
 $$
 
-Here $\epsilon$ is the **total energy density** (rest mass plus internal energy), not the rest-mass density $\rho$. Gravity couples to all of the energy, so $\epsilon$ appears in both equations. Using $\rho$ instead under-counts the mass-energy at high density and overestimates the maximum mass (see the Changelog in the README).
+Here $\epsilon$ is the **total energy density** (rest mass plus internal energy), not the rest-mass density $\rho$. Gravity couples to all of the energy, so $\epsilon$ appears in both equations. Using $\rho$ instead under-counts the mass-energy at high density and overestimates the maximum mass (see Corrections in the README).
 
 Integration starts at $r_0 = 10$ m with $m(r_0) = \tfrac{4}{3}\pi r_0^3\,\epsilon_c/c^2$ and $P(r_0) = P_c$, and uses fixed-step RK4 with $dr = 10$ m out to 30 km. The radius $R$ is where $P$ first reaches zero and the mass is $M = m(R)$. All the solver needs from the EoS is $\epsilon(P)$; each model below provides it.
 
