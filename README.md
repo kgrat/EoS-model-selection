@@ -32,12 +32,17 @@ The $\pm$ values are `dynesty`'s statistical error on $\ln\mathcal{Z}$ from a si
 The likelihood is a product of one-dimensional kernel density estimates (KDEs) of **neutron-star radius at a fixed mass**:
 
 * **$R_{1.4}$ from GW170817:** radius samples from the LIGO/Virgo EoS-insensitive analysis (Abbott et al. 2018), restricted to $1.35 < m_1 < 1.45\,M_\odot$. These radii were derived from the measured tidal deformabilities using quasi-universal relations. This project does **not** compute tidal deformabilities or use a $\Lambda$ likelihood.
-* **$R_{1.4}$ from NICER PSR J0030+0451:** radius samples with $1.35 < M < 1.45\,M_\odot$.
-* **NICER PSR J0740+6620:** radius KDE from samples with $2.0 < M < 2.15\,M_\odot$, averaged over the pulsar's mass distribution in that window. Masses the EoS cannot reach contribute zero.
+* **$R_{1.4}$ from NICER PSR J0030+0451:** radius samples from the Miller et al. (2019) analysis, with $1.35 < M < 1.45\,M_\odot$.
+* **NICER PSR J0740+6620:** radius KDE from the Dittmann et al. (2024) NICER + XMM-Newton samples (fully ionized hydrogen atmosphere) with $2.0 < M < 2.15\,M_\odot$, averaged over the pulsar's mass distribution in that window. Masses the EoS cannot reach contribute zero.
 * Radii are read off the stable branch of the M-R curve.
 * EoSs with $M_{max} < 2.01\,M_\odot$, acausal EoSs ($c_s > c$ below the maximum-mass central pressure), and polytropes with decreasing pressure are rejected.
 
 This is an approximation. Reducing each mass-radius posterior to a radius distribution in a mass window throws away the mass-radius correlation, and the two $R_{1.4}$ terms are treated as independent. PHYSICS.md lists the full set of limitations.
+
+**Limitations**
+
+* **Crust systematic.** All models use a fixed one-piece crust. For SLy it shifts $R_{1.4}$ by about +0.46 km relative to the four-piece SLy crust of Read et al. (2009): 12.16 km against 11.70 km (`validation_output.txt`). The $R_{1.4}$ values above carry a crust systematic of that size.
+* **NICER data.** The likelihood uses the Miller et al. (2019) J0030 and Dittmann et al. (2024) J0740 analyses. Newer NICER results, including the J0030 reanalyses and PSR J0437-4715, are not included.
 
 ## Computational Methodology
 
@@ -111,8 +116,8 @@ Earlier versions reported the polytrope as the preferred model ($\ln\mathcal{Z} 
 Observational data:
 
 * LIGO/Virgo GW170817: Abbott, B. P., et al., Phys. Rev. Lett. 121, 161101 (2018).
-* NICER PSR J0030+0451: Miller, M. C., et al., ApJL 887, L24 (2019); Riley, T. E., et al., ApJL 887, L21 (2019).
-* NICER PSR J0740+6620: Miller, M. C., et al., ApJL 918, L28 (2021); Riley, T. E., et al., ApJL 918, L27 (2021).
+* NICER PSR J0030+0451: Miller, M. C., Lamb, F. K., Dittmann, A. J., et al., ApJL 887, L24 (2019).
+* NICER PSR J0740+6620: Dittmann, A. J., Miller, M. C., Lamb, F. K., et al., ApJ 974, 295 (2024).
 
 Theoretical models:
 
@@ -126,13 +131,7 @@ Tools: dynesty, JAX.
 
 * Likelihood: use the full two-dimensional mass-radius posteriors instead of radius-at-fixed-mass KDEs, and compute tidal deformabilities to use the GW170817 $\Lambda$ posterior directly.
 
-* Rotation: Implement the Hartle-Thorne approximation in JAX to analyze rapidly rotating remnants (e.g., GW190814) where spherical symmetry breaks down.
-
 * Non-Parametric Inference: Move from parameterized models to Gaussian Process (GP) regression to reconstruct the EoS in a model-independent way.
-
-* Direct Inference from Raw Data: Move beyond summarized posteriors (KDEs) to infer the EoS directly from raw LIGO strain data (using Bilby) and NICER pulse profiles, utilizing the full unmarginalized prior volume for higher precision.
-
-* Next-Gen Detectors: Scale the pipeline to handle thousands of events expected from LIGO A+ using Simulation-Based Inference (SBI).
 
 ---
 *Author: Kushagra Trivedi, BS-MS 2029, IISER Bhopal*

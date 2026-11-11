@@ -105,8 +105,8 @@ $$
 $$
 
 * $\hat p_{GW}$: KDE of the GW170817 radius samples from the EoS-insensitive analysis (Abbott et al. 2018), using the samples with $1.35 < m_1 < 1.45\,M_\odot$. These radii were derived from the measured tidal deformabilities with EoS-insensitive (quasi-universal) relations, so $\Lambda$ enters only through that external step.
-* $\hat p_{J0030}$: KDE of NICER PSR J0030+0451 radius samples with $1.35 < M < 1.45\,M_\odot$.
-* $\hat p_{J0740}$: KDE of NICER PSR J0740+6620 radius samples with $2.0 < M < 2.15\,M_\odot$. It is averaged over the pulsar's mass distribution in that window, using 200 quantiles of the mass samples. Masses the EoS cannot reach contribute zero. An EoS whose $M_{max}$ only just exceeds $2.01\,M_\odot$ is therefore partly penalized, rather than having the term skipped. For EoSs that reach $2.15\,M_\odot$ the term equals $\ln\hat p_{J0740}(R_{2.08})$ to within about 0.01.
+* $\hat p_{J0030}$: KDE of NICER PSR J0030+0451 radius samples (Miller et al. 2019) with $1.35 < M < 1.45\,M_\odot$.
+* $\hat p_{J0740}$: KDE of NICER PSR J0740+6620 radius samples (Dittmann et al. 2024; NICER + XMM-Newton, fully ionized hydrogen atmosphere) with $2.0 < M < 2.15\,M_\odot$. It is averaged over the pulsar's mass distribution in that window, using 200 quantiles of the mass samples. Masses the EoS cannot reach contribute zero. An EoS whose $M_{max}$ only just exceeds $2.01\,M_\odot$ is therefore partly penalized, rather than having the term skipped. For EoSs that reach $2.15\,M_\odot$ the term equals $\ln\hat p_{J0740}(R_{2.08})$ to within about 0.01.
 
 $R(M)$ is read off the **stable branch**: the stretches of the M-R curve where $M$ increases with central density. Where several stable branches contain the same mass (twin stars), the lowest-density one is used.
 
@@ -173,5 +173,5 @@ The polytrope prior ranges overlap, so they include $P_2 \le P_1$ or $P_3 \le P_
 * Lindblom, Phys. Rev. D 82, 103011 (2010).
 * Alford, Han & Prakash, Phys. Rev. D 88, 083013 (2013).
 * Abbott et al. (LIGO/Virgo), Phys. Rev. Lett. 121, 161101 (2018).
-* Miller et al., ApJL 887, L24 (2019); Riley et al., ApJL 887, L21 (2019).
-* Miller et al., ApJL 918, L28 (2021); Riley et al., ApJL 918, L27 (2021).
+* Miller, M. C., Lamb, F. K., Dittmann, A. J., et al., ApJL 887, L24 (2019).
+* Dittmann, A. J., Miller, M. C., Lamb, F. K., et al., ApJ 974, 295 (2024).
