@@ -104,7 +104,7 @@ Earlier versions reported the polytrope as the preferred model ($\ln\mathcal{Z} 
 
 ## Acknowledgments
 
-The project design, model choices and original implementation are my own. I used Claude (Anthropic), an AI coding assistant, to help find and fix the bugs listed under [Corrections](#corrections), to write the validation tests for those fixes (`validate_energy_density.py`), and to correct the documentation.
+**AI disclosure:** In a later debugging stage I used an AI coding assistant to help find and fix bugs, validate the fixes, and update the documentation. The project design and original implementation are my own.
 
 ## References and Data Sources
 
